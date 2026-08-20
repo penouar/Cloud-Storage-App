@@ -8,8 +8,7 @@ class UserCreate(BaseModel):
 class UserUpdate(BaseModel):
     username: str | None = None
     email: str | None = None
-    password: str | None = None
-
+    
 class UserResponse(BaseModel):
     user_id: int
     username: str
