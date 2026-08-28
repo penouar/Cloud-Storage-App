@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict
-from .permission import PermissionType
+from app.models.permission import PermissionType
 
 class FileShareCreate(BaseModel):
     file_id: int
@@ -7,7 +7,7 @@ class FileShareCreate(BaseModel):
     permission: PermissionType 
 
 class FileShareUpdate(BaseModel):
-    permission: PermissionType | None = None
+    permission: PermissionType
 
 class FileShareResponse(BaseModel):
     file_id: int

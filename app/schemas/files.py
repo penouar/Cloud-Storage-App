@@ -1,16 +1,33 @@
 from pydantic import BaseModel, Field, ConfigDict
 
+
 class FileCreate(BaseModel):
     file_name: str = Field(min_length=1, max_length=100)
     file_size: int = Field(gt=0)
     file_type: str = Field(min_length=1, max_length=20)
     folder_id: int | None = None
 
+
 class FileUpdate(BaseModel):
-    file_name: str | None = None
-    file_size: int | None = None
-    file_type: str | None = None
+    file_name: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=100
+    )
+
+    file_size: int | None = Field(
+        default=None,
+        gt=0
+    )
+
+    file_type: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=20
+    )
+
     folder_id: int | None = None
+
 
 class FileResponse(BaseModel):
     file_id: int
@@ -19,4 +36,5 @@ class FileResponse(BaseModel):
     file_type: str
     folder_id: int | None = None
     user_id: int
+
     model_config = ConfigDict(from_attributes=True)
