@@ -1,8 +1,8 @@
 from sqlalchemy import ForeignKey, Enum, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from database import Base
-from .permission import PermissionType
+from app.database import Base
+from app.models.permission import PermissionType
 
 
 class FileShare(Base):

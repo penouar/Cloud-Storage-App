@@ -7,7 +7,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from database import Base
+from app.database import Base
 
 
 class File(Base):
@@ -55,7 +55,8 @@ class File(Base):
     # Shares received by other users
     shares: Mapped[list["FileShare"]] = relationship(
         "FileShare",
-        back_populates="file"
+        back_populates="file",
+        passive_deletes="all",
     )
 
     __table_args__ = (

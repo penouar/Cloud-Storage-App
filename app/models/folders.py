@@ -1,7 +1,7 @@
 from sqlalchemy import String, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from database import Base
+from app.database import Base
 
 
 class Folder(Base):
@@ -35,7 +35,8 @@ class Folder(Base):
     # Child folders
     children: Mapped[list["Folder"]] = relationship(
         "Folder",
-        back_populates="parent"
+        back_populates="parent",
+        passive_deletes="all",
     )
 
     # Owner
@@ -47,13 +48,15 @@ class Folder(Base):
     # Files inside this folder
     files: Mapped[list["File"]] = relationship(
         "File",
-        back_populates="folder"
+        back_populates="folder",
+        passive_deletes="all",
     )
 
     # Shares of this folder
     shares: Mapped[list["FolderShare"]] = relationship(
         "FolderShare",
-        back_populates="folder"
+        back_populates="folder",
+        passive_deletes="all",
     )
 
     __table_args__ = (

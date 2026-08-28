@@ -1,7 +1,7 @@
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from database import Base
+from app.database import Base
 
 
 class User(Base):
@@ -31,21 +31,25 @@ class User(Base):
     # Things owned by this user
     folders: Mapped[list["Folder"]] = relationship(
         "Folder",
-        back_populates="owner"
+        back_populates="owner",
+        passive_deletes="all",
     )
 
     files: Mapped[list["File"]] = relationship(
         "File",
-        back_populates="owner"
+        back_populates="owner",
+        passive_deletes="all",
     )
 
     # Shares received by this user
     file_shares_received: Mapped[list["FileShare"]] = relationship(
         "FileShare",
-        back_populates="user"
+        back_populates="user",
+        passive_deletes="all",
     )
 
     folder_shares_received: Mapped[list["FolderShare"]] = relationship(
         "FolderShare",
-        back_populates="user"
+        back_populates="user",
+        passive_deletes="all",
     )
