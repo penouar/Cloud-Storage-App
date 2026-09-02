@@ -1,7 +1,7 @@
 from pydantic import Field, BaseModel, ConfigDict, model_validator
 
 class UserCreate(BaseModel):
-    username: str = Field(min_length=1, max_length=20)
+    username: str = Field(min_length=1, max_length=50)
     email: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=8, max_length=100)
 

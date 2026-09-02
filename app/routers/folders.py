@@ -120,40 +120,58 @@ def get_folders(db: Session = Depends(get_db), current_user: User = Depends(get_
 
 
 @router.patch("/{folder_id}", response_model=FolderResponse)
-def update_folder(folder_id: int, folder_data: FolderUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # 1. Get the folder and verify ownership
+def update_folder(
+    folder_id: int,
+    folder_data: FolderUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # 1. Get the folder
     folder = db.query(Folder).filter(
-            Folder.folder_id == folder_id
-        ).first()
+        Folder.folder_id == folder_id
+    ).first()
 
     if folder is None:
         raise HTTPException(
-            status_code=404, 
-            detail="Folder not Found")
+            status_code=404,
+            detail="Folder not Found"
+        )
 
-    has_access = user_has_folder_access([PermissionType.EDIT], folder, current_user, db)
+    # 2. Check access
+    has_access = user_has_folder_access(
+        [PermissionType.EDIT],
+        folder,
+        current_user,
+        db
+    )
 
     if not has_access:
-        raise HTTPException(status_code=404,
-        detail="Folder not Found")
+        raise HTTPException(
+            status_code=404,
+            detail="Folder not Found"
+        )
 
-
+    # 3. Get only fields that were actually provided
     updates = folder_data.model_dump(exclude_unset=True)
 
-
+    # 4. Validate new parent
     if "parent_folder_id" in updates:
         new_parent_id = updates["parent_folder_id"]
 
+        # Cannot be its own parent
         if new_parent_id == folder.folder_id:
             raise HTTPException(
                 status_code=400,
-                detail="A folder cannot be its own parent")
+                detail="A folder cannot be its own parent"
+            )
 
         if new_parent_id is not None:
-            parent_folder =db.query(Folder).filter(
-                    Folder.folder_id == new_parent_id,
-                    Folder.user_id == current_user.user_id
-                ).first()
+
+            # Parent must exist and belong to current user
+            parent_folder = db.query(Folder).filter(
+                Folder.folder_id == new_parent_id,
+                Folder.user_id == current_user.user_id
+            ).first()
 
             if parent_folder is None:
                 raise HTTPException(
@@ -161,6 +179,25 @@ def update_folder(folder_id: int, folder_data: FolderUpdate, current_user: User 
                     detail="Parent folder not found"
                 )
 
+            # Check for circular hierarchy
+            current_parent = parent_folder
+
+            while current_parent is not None:
+
+                if current_parent.folder_id == folder.folder_id:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Cannot create circular folder hierarchy"
+                    )
+
+                if current_parent.parent_folder_id is None:
+                    break
+
+                current_parent = db.query(Folder).filter(
+                    Folder.folder_id == current_parent.parent_folder_id
+                ).first()
+
+    # 5. Determine final values
     new_name = updates.get(
         "folder_name",
         folder.folder_name
@@ -171,12 +208,13 @@ def update_folder(folder_id: int, folder_data: FolderUpdate, current_user: User 
         folder.parent_folder_id
     )
 
+    # 6. Check duplicate name in same parent
     duplicate = db.query(Folder).filter(
-            Folder.user_id == current_user.user_id,
-            Folder.folder_name == new_name,
-            Folder.parent_folder_id == new_parent_id,
-            Folder.folder_id != folder.folder_id
-        ).first()
+        Folder.user_id == current_user.user_id,
+        Folder.folder_name == new_name,
+        Folder.parent_folder_id == new_parent_id,
+        Folder.folder_id != folder.folder_id
+    ).first()
 
     if duplicate:
         raise HTTPException(
@@ -184,9 +222,11 @@ def update_folder(folder_id: int, folder_data: FolderUpdate, current_user: User 
             detail="A folder with this name already exists in this parent folder"
         )
 
+    # 7. Apply updates
     for field, value in updates.items():
         setattr(folder, field, value)
 
+    # 8. Save
     db.commit()
     db.refresh(folder)
 

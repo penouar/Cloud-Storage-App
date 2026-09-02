@@ -2,7 +2,6 @@ from pydantic import BaseModel, Field, ConfigDict
 from app.models.permission import PermissionType
 
 class FileShareCreate(BaseModel):
-    file_id: int
     to_user_id: int
     permission: PermissionType 
 
