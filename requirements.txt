@@ -21,4 +21,3 @@ uvicorn==0.52.3
 argon2-cffi
 python-jose[cryptography]
 passlib[bcrypt]
-pytest httpx
