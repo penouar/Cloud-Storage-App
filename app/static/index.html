@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cloud Drive</title>
+<style>
+:root{
+  --bg:#f5f6fa; --panel:#fff; --line:#e4e7ee; --text:#1c2130; --muted:#6b7385;
+  --accent:#3b6cf6; --accent-2:#2f56c9; --accent-soft:#e8eefe; --danger:#d43b3b; --danger-soft:#fdeaea;
+  --ok:#1f9d63; --folder:#f2b53a; --shadow:0 10px 40px rgba(20,30,60,.18);
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#12141a;--panel:#1b1e27;--line:#2b3040;--text:#e8eaf1;--muted:#8d95a9;--accent:#6b93ff;--accent-2:#88a8ff;--accent-soft:#232b45;--danger:#ff6b6b;--danger-soft:#3a2226;--folder:#e8b04a;--shadow:0 10px 40px rgba(0,0,0,.6)}
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select{font:inherit;color:inherit}
+.hidden{display:none!important}
+svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* buttons / inputs */
+.btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);padding:8px 13px;border-radius:9px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--accent-soft)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-2)}
+.btn.danger{color:var(--danger)}
+.btn.danger:hover{background:var(--danger-soft)}
+.btn:disabled{opacity:.55;cursor:default}
+.icon-btn{border:0;background:none;padding:6px;border-radius:7px;cursor:pointer;color:var(--muted);display:inline-flex}
+.icon-btn:hover{background:var(--accent-soft);color:var(--accent)}
+.icon-btn.danger:hover{background:var(--danger-soft);color:var(--danger)}
+label{display:block;font-size:12.5px;color:var(--muted);margin:12px 0 5px}
+input[type=text],input[type=password],input[type=number],input[type=email],select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--panel);outline:none}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
+/* auth */
+#auth{min-height:100%;display:grid;place-items:center;padding:20px}
+.auth-card{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px;box-shadow:var(--shadow)}
+.brand{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:650;margin-bottom:4px}
+.brand .logo{width:34px;height:34px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center}
+.brand .logo svg{width:20px;height:20px}
+.sub{color:var(--muted);margin:0 0 18px}
+.tabs{display:flex;background:var(--bg);border-radius:10px;padding:3px;margin-bottom:6px}
+.tabs button{flex:1;border:0;background:none;padding:8px;border-radius:8px;cursor:pointer;color:var(--muted)}
+.tabs button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.auth-card .btn.primary{width:100%;justify-content:center;margin-top:18px;padding:10px}
+details.srv{margin-top:16px;color:var(--muted);font-size:12.5px}
+details.srv summary{cursor:pointer}
+.err{color:var(--danger);font-size:13px;margin-top:12px;min-height:18px}
+
+/* app layout */
+#app{display:grid;grid-template-columns:240px 1fr;height:100%}
+aside{background:var(--panel);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:6px}
+aside .brand{padding:0 8px 14px;font-size:18px}
+.nav{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;cursor:pointer;border:0;background:none;text-align:left;width:100%;color:var(--text)}
+.nav:hover{background:var(--accent-soft)}
+.nav.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.spacer{flex:1}
+.me{border:1px solid var(--line);border-radius:12px;padding:11px;font-size:13px}
+.me b{display:block;font-size:14px;word-break:break-all}
+.me span{color:var(--muted);word-break:break-all}
+.me .idrow{display:flex;align-items:center;justify-content:space-between;margin-top:8px;background:var(--bg);padding:5px 8px;border-radius:8px;cursor:pointer}
+.me .idrow:hover{background:var(--accent-soft)}
+.me .idrow small{color:var(--muted)}
+.health{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;padding:6px 8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.ok{background:var(--ok)} .dot.bad{background:var(--danger)}
+main{display:flex;flex-direction:column;min-width:0;height:100%}
+.top{display:flex;align-items:center;gap:10px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+.crumbs{display:flex;align-items:center;flex-wrap:wrap;gap:2px;flex:1;min-width:180px;font-size:16px;font-weight:600}
+.crumbs button{border:0;background:none;cursor:pointer;padding:4px 7px;border-radius:7px;font:inherit;color:var(--muted)}
+.crumbs button:hover{background:var(--accent-soft);color:var(--accent)}
+.crumbs button:last-child{color:var(--text)}
+.crumbs .sep{color:var(--muted);font-weight:400}
+input.search{width:200px;flex:0 1 200px}
+.content{flex:1;overflow:auto;padding:18px 22px}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:10px 14px;border-bottom:1px solid var(--line);text-transform:uppercase;letter-spacing:.04em}
+td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+tbody tr:hover{background:color-mix(in srgb,var(--accent-soft) 55%,transparent)}
+.name{display:flex;align-items:center;gap:10px;min-width:0}
+.name .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.name.folder{cursor:pointer;font-weight:550}
+.name.folder svg{color:var(--folder);fill:var(--folder);fill-opacity:.25}
+.name.file svg{color:var(--muted)}
+.chip{font-size:11.5px;padding:2px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent);margin-left:4px}
+.muted{color:var(--muted)}
+.acts{display:flex;justify-content:flex-end;gap:2px;white-space:nowrap}
+.empty{text-align:center;color:var(--muted);padding:60px 20px}
+.empty svg{width:44px;height:44px;opacity:.5;margin-bottom:8px}
+
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(10,14,25,.5);display:grid;place-items:center;padding:16px;z-index:50}
+.modal{width:100%;max-width:460px;background:var(--panel);border-radius:16px;box-shadow:var(--shadow);padding:22px;max-height:92vh;overflow:auto;border:1px solid var(--line)}
+.modal h3{margin:0 0 4px;font-size:17px}
+.modal .row{display:flex;gap:10px}
+.modal .row>*{flex:1}
+.modal .foot{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+.share-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.share-row:last-child{border:0}
+.share-row .u{flex:1}
+.share-row select{width:100px;padding:6px 8px}
+.hint{font-size:12.5px;color:var(--muted);margin-top:8px}
+.file-drop{border:1.5px dashed var(--line);border-radius:10px;padding:14px;text-align:center;color:var(--muted);cursor:pointer}
+.file-drop:hover{border-color:var(--accent);color:var(--accent)}
+
+/* toast */
+#toasts{position:fixed;bottom:18px;right:18px;display:flex;flex-direction:column;gap:8px;z-index:100}
+.toast{background:var(--text);color:var(--bg);padding:10px 15px;border-radius:10px;box-shadow:var(--shadow);max-width:340px}
+.toast.bad{background:var(--danger);color:#fff}
+
+@media (max-width:760px){
+  #app{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+  aside{flex-direction:row;align-items:center;flex-wrap:wrap;padding:10px;border-right:0;border-bottom:1px solid var(--line)}
+  aside .brand{padding:0}
+  .nav{width:auto}
+  .me,.health{display:none}
+  .col-hide{display:none}
+  .content{padding:12px}
+  input.search{width:100%;flex:1 1 100%}
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.5a4 4 0 0 1 0 8.5z"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></symbol>
+    <symbol id="i-move" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M16 8l4 4-4 4M20 12H9"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.5-3.5L4 9M4 4v5h5M4 13a8 8 0 0 0 14.5 3.5L20 15M20 20v-5h-5"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></symbol>
+  </defs>
+</svg>
+
+<!-- AUTH -->
+<div id="auth" class="hidden">
+  <form class="auth-card" id="authForm" autocomplete="on">
+    <div class="brand"><span class="logo"><svg><use href="#i-cloud"/></svg></span>Cloud Drive</div>
+    <p class="sub">Sign in to manage your files, folders and sharing.</p>
+    <div class="tabs">
+      <button type="button" id="tabLogin" class="on">Log in</button>
+      <button type="button" id="tabSignup">Sign up</button>
+    </div>
+    <label for="aUser" id="aUserLbl">Username or email</label>
+    <input id="aUser" type="text" required maxlength="100" autocomplete="username">
+    <div id="emailWrap" class="hidden">
+      <label for="aEmail">Email</label>
+      <input id="aEmail" type="email" maxlength="100" autocomplete="email">
+    </div>
+    <label for="aPass">Password <span id="passHint" class="hidden">(min 8 characters)</span></label>
+    <input id="aPass" type="password" required maxlength="100" autocomplete="current-password">
+    <div class="err" id="authErr"></div>
+    <button class="btn primary" id="authBtn" type="submit">Log in</button>
+    <details class="srv">
+      <summary>Server settings</summary>
+      <label for="aApi">API base URL (leave empty when served by the backend)</label>
+      <input id="aApi" type="text" placeholder="http://localhost:8000">
+    </details>
+  </form>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <aside>
+    <div class="brand"><span class="logo"><svg><use href="#i-cloud"/></svg></span>Cloud Drive</div>
+    <button class="nav on" id="navDrive"><svg><use href="#i-home"/></svg>My Drive</button>
+    <button class="nav" id="navShared"><svg><use href="#i-users"/></svg>Shared with me</button>
+    <div class="spacer"></div>
+    <div class="health"><span class="dot" id="hDot"></span><span id="hTxt">Checking server…</span></div>
+    <div class="me">
+      <b id="meName"></b><span id="meMail"></span>
+      <div class="idrow" id="meId" title="Click to copy — others need this ID to share with you"><small>My user ID</small><b id="meIdVal"></b></div>
+    </div>
+    <button class="nav" id="btnLogout"><svg><use href="#i-logout"/></svg>Log out</button>
+  </aside>
+  <main>
+    <div class="top">
+      <div class="crumbs" id="crumbs"></div>
+      <input class="search" id="search" type="text" placeholder="Filter by name…">
+      <button class="btn" id="btnRefresh" title="Refresh"><svg><use href="#i-refresh"/></svg></button>
+      <button class="btn" id="btnNewFolder"><svg><use href="#i-folder"/></svg>New folder</button>
+      <button class="btn primary" id="btnNewFile"><svg><use href="#i-plus"/></svg>Add file</button>
+    </div>
+    <div class="content" id="content"></div>
+  </main>
+</div>
+
+<div id="modalHost"></div>
+<div id="toasts"></div>
+
+<script>
+"use strict";
+/* ---------------- state & api ---------------- */
+const $ = s => document.querySelector(s);
+const state = { token:null, me:null, folders:[], files:[], view:"drive", cwd:null, q:"", api:"" };
+const store = {
+  get(k){ try{ return localStorage.getItem(k) }catch{ return null } },
+  set(k,v){ try{ localStorage.setItem(k,v) }catch{} },
+  del(k){ try{ localStorage.removeItem(k) }catch{} }
+};
+state.api = (new URLSearchParams(location.search).get("api") || store.get("api") || (location.protocol==="file:" ? "http://localhost:8000" : "")).replace(/\/$/,"");
+state.token = store.get("token");
+
+class ApiError extends Error{ constructor(status,msg){ super(msg); this.status=status } }
+async function api(method, path, body){
+  const headers = {};
+  if(body!==undefined) headers["Content-Type"]="application/json";
+  if(state.token) headers["Authorization"]="Bearer "+state.token;
+  let res;
+  try{ res = await fetch(state.api+path,{method,headers,body:body!==undefined?JSON.stringify(body):undefined}); }
+  catch(e){ throw new ApiError(0,"Cannot reach the server. Is the backend running?"); }
+  if(res.status===204) return null;
+  let data=null; try{ data = await res.json() }catch{}
+  if(!res.ok){
+    let msg = data && data.detail;
+    if(Array.isArray(msg)) msg = msg.map(d=>(d.loc||[]).slice(1).join(".")+": "+d.msg).join("; ");
+    if(res.status===401 && state.token && path!=="/users/login"){ logout(true); }
+    throw new ApiError(res.status, msg || ("Request failed ("+res.status+")"));
+  }
+  return data;
+}
+
+/* ---------------- helpers ---------------- */
+function toast(msg, bad){
+  const t=document.createElement("div"); t.className="toast"+(bad?" bad":""); t.textContent=msg;
+  $("#toasts").appendChild(t); setTimeout(()=>t.remove(), bad?5000:2600);
+}
+async function guard(fn){ try{ return await fn() }catch(e){ if(e.status!==401) toast(e.message,true); return undefined } }
+function esc(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])) }
+function fmtSize(n){ if(n<1024) return n+" B"; const u=["KB","MB","GB","TB"]; let i=-1; do{ n/=1024; i++ }while(n>=1024&&i<3); return n.toFixed(n<10?1:0)+" "+u[i]; }
+const ico = n => `<svg><use href="#i-${n}"/></svg>`;
+const byName = (a,b,k)=>a[k].localeCompare(b[k],undefined,{numeric:true,sensitivity:"base"});
+const mine = x => x.user_id===state.me.user_id;
+const folderById = id => state.folders.find(f=>f.folder_id===id);
+
+/* ---------------- modal ---------------- */
+function modal(html, onMount){
+  const host=$("#modalHost");
+  host.innerHTML=`<div class="overlay"><div class="modal">${html}</div></div>`;
+  const ov=host.firstChild;
+  ov.addEventListener("mousedown",e=>{ if(e.target===ov) closeModal() });
+  const first=ov.querySelector("input:not([type=file]),select"); first&&first.focus();
+  onMount&&onMount(ov.firstChild);
+}
+function closeModal(){ $("#modalHost").innerHTML="" }
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeModal() });
+
+function formModal({title, sub, fields, submit, danger, onSubmit}){
+  const inner = fields.map(f=>f.html).join("");
+  modal(`<form><h3>${esc(title)}</h3>${sub?`<div class="hint" style="margin:0 0 4px">${sub}</div>`:""}${inner}
+    <div class="err" id="mErr"></div>
+    <div class="foot"><button type="button" class="btn" data-x>Cancel</button>
+    <button class="btn ${danger?"danger":"primary"}" type="submit">${esc(submit)}</button></div></form>`, m=>{
+    m.querySelector("[data-x]").onclick=closeModal;
+    m.querySelector("form").onsubmit=async e=>{
+      e.preventDefault();
+      const btn=m.querySelector("button[type=submit]"); btn.disabled=true;
+      try{ await onSubmit(m); closeModal(); }
+      catch(err){ m.querySelector("#mErr").textContent=err.message; btn.disabled=false; }
+    };
+  });
+}
+
+/* folder <select> options (own folders only, optionally excluding a subtree) */
+function folderOptions(exclude, selected){
+  const own=state.folders.filter(mine);
+  const bad=new Set();
+  if(exclude!=null){
+    bad.add(exclude);
+    let grew=true;
+    while(grew){ grew=false; for(const f of own) if(!bad.has(f.folder_id)&&bad.has(f.parent_folder_id)){ bad.add(f.folder_id); grew=true } }
+  }
+  const path=f=>{ const p=[]; let c=f, n=0; while(c&&n++<50){ p.unshift(c.folder_name); c=folderById(c.parent_folder_id) } return "/ "+p.join(" / ") };
+  const opts=own.filter(f=>!bad.has(f.folder_id)).map(f=>[f.folder_id,path(f)]).sort((a,b)=>a[1].localeCompare(b[1]));
+  return `<option value="">/ (My Drive root)</option>`+opts.map(([id,p])=>`<option value="${id}" ${id===selected?"selected":""}>${esc(p)}</option>`).join("");
+}
+
+/* ---------------- auth ---------------- */
+let mode="login";
+function setMode(m){
+  mode=m;
+  $("#tabLogin").classList.toggle("on",m==="login"); $("#tabSignup").classList.toggle("on",m==="signup");
+  $("#emailWrap").classList.toggle("hidden",m==="login"); $("#aEmail").required=m==="signup";
+  $("#passHint").classList.toggle("hidden",m==="login");
+  $("#aUserLbl").textContent = m==="login"?"Username or email":"Username";
+  $("#aUser").maxLength = m==="login"?100:20;
+  $("#aPass").minLength = m==="login"?0:8;
+  $("#aPass").autocomplete = m==="login"?"current-password":"new-password";
+  $("#authBtn").textContent = m==="login"?"Log in":"Create account";
+  $("#authErr").textContent="";
+}
+$("#tabLogin").onclick=()=>setMode("login"); $("#tabSignup").onclick=()=>setMode("signup");
+$("#aApi").value=state.api;
+$("#authForm").onsubmit=async e=>{
+  e.preventDefault();
+  state.api=$("#aApi").value.trim().replace(/\/$/,""); store.set("api",state.api);
+  const u=$("#aUser").value.trim(), p=$("#aPass").value, btn=$("#authBtn"); btn.disabled=true; $("#authErr").textContent="";
+  try{
+    if(mode==="signup"){
+      await api("POST","/users/signup",{username:u,email:$("#aEmail").value.trim(),password:p});
+      toast("Account created — logging you in…");
+    }
+    const body = mode==="signup" ? {username:u,password:p} : (u.includes("@")?{email:u,password:p}:{username:u,password:p});
+    const t=await api("POST","/users/login",body);
+    state.token=t.access_token; store.set("token",state.token);
+    await enter();
+  }catch(err){ $("#authErr").textContent=err.message }
+  finally{ btn.disabled=false }
+};
+function logout(expired){
+  state.token=null; state.me=null; store.del("token"); closeModal();
+  $("#app").classList.add("hidden"); $("#auth").classList.remove("hidden");
+  $("#aPass").value=""; if(expired===true) $("#authErr").textContent="Session expired — please log in again.";
+}
+$("#btnLogout").onclick=()=>logout();
+
+async function enter(){
+  state.me = await api("GET","/users/me");
+  $("#meName").textContent=state.me.username; $("#meMail").textContent=state.me.email; $("#meIdVal").textContent="#"+state.me.user_id;
+  $("#auth").classList.add("hidden"); $("#app").classList.remove("hidden");
+  state.cwd=null; state.view="drive"; state.q=""; $("#search").value="";
+  await reload();
+  pingHealth();
+}
+$("#meId").onclick=async()=>{ try{ await navigator.clipboard.writeText(String(state.me.user_id)); toast("User ID copied") }catch{ toast("Your user ID is "+state.me.user_id) } };
+async function pingHealth(){
+  try{ await api("GET","/health"); $("#hDot").className="dot ok"; $("#hTxt").textContent="Server & database OK" }
+  catch(e){ $("#hDot").className="dot bad"; $("#hTxt").textContent="Server unreachable" }
+}
+
+/* ---------------- data ---------------- */
+async function reload(){
+  const r = await guard(()=>Promise.all([api("GET","/folders"),api("GET","/files")]));
+  if(!r) return;
+  // shared items can appear twice if reachable through several links; de-dupe
+  const dedupe=(a,k)=>[...new Map(a.map(x=>[x[k],x])).values()];
+  state.folders=dedupe(r[0],"folder_id"); state.files=dedupe(r[1],"file_id");
+  if(state.cwd!=null && !folderById(state.cwd)) state.cwd=null;
+  render();
+}
+
+/* ---------------- render ---------------- */
+$("#navDrive").onclick=()=>{ state.view="drive"; state.cwd=null; render() };
+$("#navShared").onclick=()=>{ state.view="shared"; render() };
+$("#search").oninput=e=>{ state.q=e.target.value.trim().toLowerCase(); render() };
+$("#btnRefresh").onclick=()=>{ reload(); pingHealth() };
+
+function render(){
+  $("#navDrive").classList.toggle("on",state.view==="drive");
+  $("#navShared").classList.toggle("on",state.view==="shared");
+  const shared = state.view==="shared";
+  $("#btnNewFolder").classList.toggle("hidden",shared); $("#btnNewFile").classList.toggle("hidden",shared);
+
+  // breadcrumbs
+  const cr=$("#crumbs");
+  if(shared){ cr.innerHTML=`<button disabled style="color:var(--text)">Shared with me</button>`; }
+  else{
+    const chain=[]; let c=folderById(state.cwd), n=0; while(c&&n++<50){ chain.unshift(c); c=folderById(c.parent_folder_id) }
+    cr.innerHTML=`<button data-f="">My Drive</button>`+chain.map(f=>`<span class="sep">/</span><button data-f="${f.folder_id}">${esc(f.folder_name)}</button>`).join("");
+    cr.querySelectorAll("button").forEach(b=>b.onclick=()=>{ state.cwd=b.dataset.f===""?null:+b.dataset.f; render() });
+  }
+
+  let folders, files;
+  if(shared){ folders=state.folders.filter(f=>!mine(f)); files=state.files.filter(f=>!mine(f)); }
+  else{ folders=state.folders.filter(f=>mine(f)&&f.parent_folder_id===state.cwd); files=state.files.filter(f=>mine(f)&&f.folder_id===state.cwd); }
+  if(state.q){ folders=folders.filter(f=>f.folder_name.toLowerCase().includes(state.q)); files=files.filter(f=>f.file_name.toLowerCase().includes(state.q)); }
+  folders.sort((a,b)=>byName(a,b,"folder_name")); files.sort((a,b)=>byName(a,b,"file_name"));
+
+  const box=$("#content");
+  if(!folders.length&&!files.length){
+    box.innerHTML=`<div class="empty">${ico(shared?"users":"folder")}<div>${state.q?"Nothing matches your filter.":shared?"Nothing has been shared with you yet.":"This folder is empty. Create a folder or add a file."}</div></div>`;
+    return;
+  }
+  const act=(a,id,t,i,cls="")=>`<button class="icon-btn ${cls}" data-a="${a}" data-id="${id}" title="${t}">${ico(i)}</button>`;
+  const rows=[];
+  for(const f of folders){
+    rows.push(`<tr><td><div class="name folder" ${mine(f)?`data-open="${f.folder_id}"`:`style="cursor:default"`}>${ico("folder")}<span class="t">${esc(f.folder_name)}</span>${mine(f)?"":`<span class="chip">shared</span>`}</div></td>
+      <td class="muted col-hide">Folder</td><td class="muted col-hide">—</td>
+      <td class="muted col-hide">${mine(f)?"You":"User #"+f.user_id}</td>
+      <td><div class="acts">${act("fd-share",f.folder_id,"Share","share",mine(f)?"":"hidden")}${act("fd-edit",f.folder_id,"Rename","edit")}${mine(f)?act("fd-move",f.folder_id,"Move","move"):""}${mine(f)?act("fd-del",f.folder_id,"Delete","trash","danger"):""}</div></td></tr>`);
+  }
+  for(const f of files){
+    rows.push(`<tr><td><div class="name file">${ico("file")}<span class="t">${esc(f.file_name)}</span>${mine(f)?"":`<span class="chip">shared</span>`}</div></td>
+      <td class="muted col-hide">${esc(f.file_type)}</td><td class="muted col-hide">${fmtSize(f.file_size)}</td>
+      <td class="muted col-hide">${mine(f)?"You":"User #"+f.user_id}</td>
+      <td><div class="acts">${act("fl-info",f.file_id,"Details","info")}${mine(f)?act("fl-share",f.file_id,"Share","share"):""}${act("fl-edit",f.file_id,"Edit / rename","edit")}${mine(f)?act("fl-move",f.file_id,"Move","move"):""}${mine(f)?act("fl-del",f.file_id,"Delete","trash","danger"):""}</div></td></tr>`);
+  }
+  box.innerHTML=`<table><thead><tr><th>Name</th><th class="col-hide">Type</th><th class="col-hide">Size</th><th class="col-hide">Owner</th><th></th></tr></thead><tbody>${rows.join("")}</tbody></table>`;
+  box.querySelectorAll("[data-open]").forEach(el=>el.onclick=()=>{ const id=+el.dataset.open; if(state.view==="shared") { state.view="drive"; } state.cwd=id; render(); });
+  box.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>actions[b.dataset.a](+b.dataset.id));
+  // hide (rather than emit) share button on shared folders
+  box.querySelectorAll(".icon-btn.hidden").forEach(b=>b.remove());
+}
+
+/* ---------------- actions ---------------- */
+const fileById = id => state.files.find(f=>f.file_id===id);
+const actions = {
+  "fd-edit"(id){
+    const f=folderById(id);
+    formModal({title:"Rename folder",submit:"Save",fields:[{html:`<label>Folder name</label><input id="fName" type="text" maxlength="100" required value="${esc(f.folder_name)}">`}],
+      async onSubmit(){ await api("PATCH","/folders/"+id,{folder_name:$("#fName").value.trim()}); toast("Folder renamed"); await reload(); }});
+  },
+  "fd-move"(id){
+    const f=folderById(id);
+    formModal({title:"Move folder",sub:`Move “${esc(f.folder_name)}” into:`,submit:"Move",fields:[{html:`<label>Destination</label><select id="fDest">${folderOptions(id,f.parent_folder_id)}</select>`}],
+      async onSubmit(){ const v=$("#fDest").value; await api("PATCH","/folders/"+id,{parent_folder_id:v===""?null:+v}); toast("Folder moved"); await reload(); }});
+  },
+  "fd-del"(id){
+    const f=folderById(id);
+    if(!mine(f)){ toast("Only the owner can delete this folder.",true); return; }
+    formModal({title:"Delete folder?",sub:`“${esc(f.folder_name)}” and everything inside it (subfolders and files) will be permanently deleted.`,submit:"Delete",danger:true,fields:[],
+      async onSubmit(){ await api("DELETE","/folders/"+id); toast("Folder deleted"); await reload(); }});
+  },
+  "fd-share"(id){ shareModal("folder",id) },
+
+  "fl-info"(id){
+    const f=fileById(id), fo=folderById(f.folder_id);
+    modal(`<h3>${esc(f.file_name)}</h3><div class="hint" style="margin-bottom:8px">File details (fetched from the server)</div><div id="det" class="muted">Loading…</div><div class="foot"><button class="btn" data-x>Close</button></div>`, async m=>{
+      m.querySelector("[data-x]").onclick=closeModal;
+      const d=await guard(()=>api("GET","/files/"+id)); if(!d) return;
+      m.querySelector("#det").innerHTML=`<table style="border:0">${[["File ID","#"+d.file_id],["Name",esc(d.file_name)],["Type",esc(d.file_type)],["Size",fmtSize(d.file_size)+" ("+d.file_size+" bytes)"],["Folder",d.folder_id==null?"My Drive root":esc((folderById(d.folder_id)||{folder_name:"#"+d.folder_id}).folder_name)],["Owner",d.user_id===state.me.user_id?"You":"User #"+d.user_id]].map(r=>`<tr><td class="muted" style="padding:6px 0;border:0;width:90px">${r[0]}</td><td style="padding:6px 0;border:0;color:var(--text)">${r[1]}</td></tr>`).join("")}</table>`;
+    });
+  },
+  "fl-edit"(id){
+    const f=fileById(id);
+    formModal({title:"Edit file",sub:"Update the file’s metadata.",submit:"Save",fields:[
+      {html:`<label>File name</label><input id="eName" type="text" maxlength="100" required value="${esc(f.file_name)}">`},
+      {html:`<div class="row"><div><label>Type</label><input id="eType" type="text" maxlength="20" required value="${esc(f.file_type)}"></div><div><label>Size (bytes)</label><input id="eSize" type="number" min="1" required value="${f.file_size}"></div></div>`}],
+      async onSubmit(){ await api("PATCH","/files/"+id,{file_name:$("#eName").value.trim(),file_type:$("#eType").value.trim(),file_size:+$("#eSize").value}); toast("File updated"); await reload(); }});
+  },
+  "fl-move"(id){
+    const f=fileById(id);
+    formModal({title:"Move file",sub:`Move “${esc(f.file_name)}” into:`,submit:"Move",fields:[{html:`<label>Destination</label><select id="fDest">${folderOptions(null,f.folder_id)}</select>`}],
+      async onSubmit(){ const v=$("#fDest").value; await api("PATCH","/files/"+id,{folder_id:v===""?null:+v}); toast("File moved"); await reload(); }});
+  },
+  "fl-del"(id){
+    const f=fileById(id);
+    formModal({title:"Delete file?",sub:`“${esc(f.file_name)}” will be permanently deleted.`,submit:"Delete",danger:true,fields:[],
+      async onSubmit(){ await api("DELETE","/files/"+id); toast("File deleted"); await reload(); }});
+  },
+  "fl-share"(id){ shareModal("file",id) }
+};
+
+$("#btnNewFolder").onclick=()=>{
+  formModal({title:"New folder",sub:state.cwd==null?"In My Drive":"In “"+esc(folderById(state.cwd).folder_name)+"”",submit:"Create",fields:[{html:`<label>Folder name</label><input id="fName" type="text" maxlength="100" required>`}],
+    async onSubmit(){ await api("POST","/folders/create",{folder_name:$("#fName").value.trim(),parent_folder_id:state.cwd}); toast("Folder created"); await reload(); }});
+};
+
+$("#btnNewFile").onclick=()=>{
+  formModal({title:"Add file",sub:"Pick a file from your computer to fill in the details automatically. The backend stores file metadata (name, type, size).",submit:"Add",fields:[
+    {html:`<label class="file-drop" style="display:block;margin-top:12px;color:var(--muted)" id="drop">Click to choose a file (optional)<input id="pick" type="file" class="hidden"></label>`},
+    {html:`<label>File name</label><input id="nName" type="text" maxlength="100" required>`},
+    {html:`<div class="row"><div><label>Type (extension)</label><input id="nType" type="text" maxlength="20" required placeholder="pdf"></div><div><label>Size (bytes)</label><input id="nSize" type="number" min="1" required placeholder="1024"></div></div>`}],
+    async onSubmit(){ await api("POST","/files/create",{file_name:$("#nName").value.trim(),file_type:$("#nType").value.trim(),file_size:+$("#nSize").value,folder_id:state.cwd}); toast("File added"); await reload(); }});
+  $("#pick").onchange=e=>{
+    const f=e.target.files[0]; if(!f) return;
+    $("#nName").value=f.name.slice(0,100);
+    const ext=(f.name.includes(".")?f.name.split(".").pop():(f.type||"file")).slice(0,20);
+    $("#nType").value=ext; $("#nSize").value=f.size||""; $("#drop").firstChild.textContent="Selected: "+f.name;
+    if(!f.size) $("#mErr").textContent="This file is empty — the backend requires size > 0.";
+  };
+};
+
+/* sharing (files + folders share the same shape) */
+function shareModal(kind, id){
+  const isF = kind==="folder";
+  const item = isF ? folderById(id) : fileById(id);
+  const label = isF ? item.folder_name : item.file_name;
+  const base = (isF?"/folders/":"/files/")+id;
+  modal(`<h3>Share “${esc(label)}”</h3><div class="hint" style="margin:0 0 10px">Give other users read or edit access. They need to send you their user ID (shown bottom-left in their app).</div>
+    <div id="shList" class="muted">Loading…</div>
+    <form id="shForm" style="margin-top:14px;border-top:1px solid var(--line);padding-top:4px">
+      <div class="row"><div><label>User ID</label><input id="shUid" type="number" min="1" required placeholder="e.g. 2"></div>
+      <div><label>Permission</label><select id="shPerm"><option value="read">Can view</option><option value="edit">Can edit</option></select></div></div>
+      <div class="err" id="mErr"></div>
+      <div class="foot"><button type="button" class="btn" data-x>Close</button><button class="btn primary" type="submit">Share</button></div>
+    </form>`, m=>{
+    m.querySelector("[data-x]").onclick=closeModal;
+    const list=m.querySelector("#shList");
+    async function load(){
+      const shares=await guard(()=>api("GET",base+"/shares")); if(!shares) return;
+      list.innerHTML = shares.length ? shares.map(s=>`<div class="share-row"><div class="u">User <b style="color:var(--text)">#${s.to_user_id}</b></div>
+        <select data-u="${s.to_user_id}"><option value="read" ${s.permission==="read"?"selected":""}>View</option><option value="edit" ${s.permission==="edit"?"selected":""}>Edit</option></select>
+        <button class="icon-btn danger" data-rm="${s.to_user_id}" title="Revoke access">${ico("trash")}</button></div>`).join("") : "Not shared with anyone yet.";
+      list.querySelectorAll("select[data-u]").forEach(sel=>sel.onchange=async()=>{ if(await guard(()=>api("PATCH",`${base}/shares/${sel.dataset.u}`,{permission:sel.value}))) toast("Permission updated"); load(); });
+      list.querySelectorAll("[data-rm]").forEach(b=>b.onclick=async()=>{ await guard(()=>api("DELETE",`${base}/shares/${b.dataset.rm}`)); toast("Access revoked"); load(); });
+    }
+    load();
+    m.querySelector("#shForm").onsubmit=async e=>{
+      e.preventDefault(); m.querySelector("#mErr").textContent="";
+      try{ await api("POST",base+"/share",{to_user_id:+$("#shUid").value,permission:$("#shPerm").value}); $("#shUid").value=""; toast("Shared"); load(); }
+      catch(err){ m.querySelector("#mErr").textContent=err.message }
+    };
+  });
+}
+
+/* ---------------- boot ---------------- */
+(async function boot(){
+  setMode("login");
+  if(state.token){
+    try{ await enter(); return }catch(e){ state.token=null; store.del("token") }
+  }
+  $("#auth").classList.remove("hidden");
+})();
+</script>
+</body>
+</html>

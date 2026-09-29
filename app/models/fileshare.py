@@ -21,7 +21,8 @@ class FileShare(Base):
     permission: Mapped[PermissionType] = mapped_column(
         Enum(
             PermissionType,
-            name="perm_type"
+            name="perm_type",
+            values_callable=lambda enum_cls: [m.value for m in enum_cls]
         ),
         nullable=False
     )
