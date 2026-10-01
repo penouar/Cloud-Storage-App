@@ -1,4 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+import mimetypes
+import os
+import uuid
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse as DiskFileResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -19,6 +25,21 @@ router = APIRouter(
     prefix="/files",
     tags=["File"]
 )
+
+# Where the real file contents are kept on disk (one blob per file_id).
+STORAGE_DIR = Path(os.getenv("STORAGE_DIR", "storage"))
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "100")) * 1024 * 1024
+
+
+def blob_path(file_id: int) -> Path:
+    return STORAGE_DIR / str(file_id)
+
+
+def remove_blob(file_id: int):
+    try:
+        blob_path(file_id).unlink()
+    except FileNotFoundError:
+        pass
 
 
 
@@ -237,6 +258,70 @@ def delete_file(
 
     db.delete(the_file)
     db.commit()
+    remove_blob(file_id)
+
+
+@router.put("/{file_id}/content", response_model=FileResponse)
+async def upload_file_content(
+    file_id: int,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Upload (or replace) the real bytes of a file. Body = raw file bytes."""
+    the_file = db.query(File).filter(File.file_id == file_id).first()
+
+    if the_file is None or not user_has_file_access([PermissionType.EDIT], the_file, current_user, db):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = STORAGE_DIR / f".{file_id}.{uuid.uuid4().hex}.tmp"
+    size = 0
+    try:
+        with open(tmp, "wb") as out:
+            async for chunk in request.stream():
+                size += len(chunk)
+                if size > MAX_UPLOAD_BYTES:
+                    raise HTTPException(status_code=413, detail="File too large")
+                out.write(chunk)
+        if size == 0:
+            raise HTTPException(status_code=400, detail="Empty files are not allowed")
+        os.replace(tmp, blob_path(file_id))
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+
+    the_file.file_size = size
+    db.commit()
+    db.refresh(the_file)
+    return the_file
+
+
+@router.get("/{file_id}/content")
+def download_file_content(
+    file_id: int,
+    download: bool = False,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download / view the real bytes of a file (needs READ or EDIT access)."""
+    the_file = db.query(File).filter(File.file_id == file_id).first()
+
+    if the_file is None or not user_has_file_access([PermissionType.READ, PermissionType.EDIT], the_file, current_user, db):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    path = blob_path(file_id)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="This file has no content uploaded yet")
+
+    media_type = mimetypes.guess_type(the_file.file_name)[0] or "application/octet-stream"
+    return DiskFileResponse(
+        path,
+        media_type=media_type,
+        filename=the_file.file_name,
+        content_disposition_type="attachment" if download else "inline",
+        headers={"X-Content-Type-Options": "nosniff"},
+    )
 
 
 @router.post("/{file_id}/share", response_model=FileShareResponse)

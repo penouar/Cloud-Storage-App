@@ -242,8 +242,20 @@ def delete_folder(folder_id: int, current_user: User = Depends(get_current_user)
             status_code=404,
             detail="Folder not Found"
         )
+    # Collect every file inside this folder tree so their stored contents can be removed too
+    from app.models.files import File
+    from app.routers.files import remove_blob
+    tree, queue = [], [the_folder.folder_id]
+    while queue:
+        tree.extend(queue)
+        queue = [f.folder_id for f in db.query(Folder).filter(Folder.parent_folder_id.in_(queue)).all()]
+    file_ids = [f.file_id for f in db.query(File).filter(File.folder_id.in_(tree)).all()]
+
     db.delete(the_folder)
     db.commit()
+
+    for fid in file_ids:
+        remove_blob(fid)
 
 @router.post("/{folder_id}/share", response_model= FolderShareResponse)
 def create_foldershare(folder_id: int, user_data: FolderShareCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):

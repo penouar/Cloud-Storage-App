@@ -86,6 +86,13 @@ tbody tr:hover{background:color-mix(in srgb,var(--accent-soft) 55%,transparent)}
 .name.folder{cursor:pointer;font-weight:550}
 .name.folder svg{color:var(--folder);fill:var(--folder);fill-opacity:.25}
 .name.file svg{color:var(--muted)}
+.name.file{cursor:pointer}
+.name.file:hover .t{color:var(--accent);text-decoration:underline}
+.preview{display:flex;justify-content:center;align-items:center;min-height:120px;background:var(--bg);border-radius:10px;overflow:auto;max-height:65vh}
+.preview img,.preview video{max-width:100%;max-height:65vh}
+.preview iframe{width:100%;height:65vh;border:0}
+.preview pre{margin:0;padding:14px;width:100%;white-space:pre-wrap;word-break:break-word;font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace;align-self:flex-start}
+.modal.wide{max-width:820px}
 .chip{font-size:11.5px;padding:2px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent);margin-left:4px}
 .muted{color:var(--muted)}
 .acts{display:flex;justify-content:flex-end;gap:2px;white-space:nowrap}
@@ -140,6 +147,8 @@ tbody tr:hover{background:color-mix(in srgb,var(--accent-soft) 55%,transparent)}
     <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M16 8l4 4-4 4M20 12H9"/></symbol>
     <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.5-3.5L4 9M4 4v5h5M4 13a8 8 0 0 0 14.5 3.5L20 15M20 20v-5h-5"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></symbol>
     <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></symbol>
   </defs>
 </svg>
@@ -230,6 +239,30 @@ async function api(method, path, body){
     throw new ApiError(res.status, msg || ("Request failed ("+res.status+")"));
   }
   return data;
+}
+
+async function apiBlob(path){
+  let res;
+  try{ res = await fetch(state.api+path,{headers:{Authorization:"Bearer "+state.token}}); }
+  catch(e){ throw new ApiError(0,"Cannot reach the server. Is the backend running?"); }
+  if(!res.ok){
+    let d=null; try{ d=await res.json() }catch{}
+    if(res.status===401) logout(true);
+    throw new ApiError(res.status,(d&&d.detail)||("Request failed ("+res.status+")"));
+  }
+  return res.blob();
+}
+async function uploadContent(id, file){
+  let res;
+  try{ res = await fetch(state.api+"/files/"+id+"/content",{method:"PUT",headers:{Authorization:"Bearer "+state.token,"Content-Type":"application/octet-stream"},body:file}); }
+  catch(e){ throw new ApiError(0,"Upload failed: cannot reach the server."); }
+  let d=null; try{ d=await res.json() }catch{}
+  if(!res.ok) throw new ApiError(res.status,(d&&d.detail)||("Upload failed ("+res.status+")"));
+  return d;
+}
+function saveBlob(blob,name){
+  const url=URL.createObjectURL(blob), a=document.createElement("a");
+  a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000);
 }
 
 /* ---------------- helpers ---------------- */
@@ -392,10 +425,10 @@ function render(){
       <td><div class="acts">${act("fd-share",f.folder_id,"Share","share",mine(f)?"":"hidden")}${act("fd-edit",f.folder_id,"Rename","edit")}${mine(f)?act("fd-move",f.folder_id,"Move","move"):""}${mine(f)?act("fd-del",f.folder_id,"Delete","trash","danger"):""}</div></td></tr>`);
   }
   for(const f of files){
-    rows.push(`<tr><td><div class="name file">${ico("file")}<span class="t">${esc(f.file_name)}</span>${mine(f)?"":`<span class="chip">shared</span>`}</div></td>
+    rows.push(`<tr><td><div class="name file" data-a="fl-view" data-id="${f.file_id}">${ico("file")}<span class="t">${esc(f.file_name)}</span>${mine(f)?"":`<span class="chip">shared</span>`}</div></td>
       <td class="muted col-hide">${esc(f.file_type)}</td><td class="muted col-hide">${fmtSize(f.file_size)}</td>
       <td class="muted col-hide">${mine(f)?"You":"User #"+f.user_id}</td>
-      <td><div class="acts">${act("fl-info",f.file_id,"Details","info")}${mine(f)?act("fl-share",f.file_id,"Share","share"):""}${act("fl-edit",f.file_id,"Edit / rename","edit")}${mine(f)?act("fl-move",f.file_id,"Move","move"):""}${mine(f)?act("fl-del",f.file_id,"Delete","trash","danger"):""}</div></td></tr>`);
+      <td><div class="acts">${act("fl-view",f.file_id,"Open / preview","eye")}${act("fl-dl",f.file_id,"Download","download")}${act("fl-info",f.file_id,"Details","info")}${mine(f)?act("fl-share",f.file_id,"Share","share"):""}${act("fl-edit",f.file_id,"Edit / rename","edit")}${mine(f)?act("fl-move",f.file_id,"Move","move"):""}${mine(f)?act("fl-del",f.file_id,"Delete","trash","danger"):""}</div></td></tr>`);
   }
   box.innerHTML=`<table><thead><tr><th>Name</th><th class="col-hide">Type</th><th class="col-hide">Size</th><th class="col-hide">Owner</th><th></th></tr></thead><tbody>${rows.join("")}</tbody></table>`;
   box.querySelectorAll("[data-open]").forEach(el=>el.onclick=()=>{ const id=+el.dataset.open; if(state.view==="shared") { state.view="drive"; } state.cwd=id; render(); });
@@ -425,6 +458,28 @@ const actions = {
   },
   "fd-share"(id){ shareModal("folder",id) },
 
+  async "fl-dl"(id){
+    const f=fileById(id);
+    const b=await guard(()=>apiBlob("/files/"+id+"/content?download=true")); if(b) saveBlob(b,f.file_name);
+  },
+  "fl-view"(id){
+    const f=fileById(id);
+    modal(`<h3>${esc(f.file_name)}</h3><div class="hint" style="margin:0 0 10px">${esc(f.file_type)} · ${fmtSize(f.file_size)}</div><div class="preview" id="pv"><span class="muted">Loading…</span></div><div class="foot"><button class="btn" id="pvDl">${ico("download")}Download</button><button class="btn primary" data-x>Close</button></div>`, async m=>{
+      m.classList.add("wide"); m.querySelector("[data-x]").onclick=closeModal;
+      const pv=m.querySelector("#pv"); let blob;
+      try{ blob=await apiBlob("/files/"+id+"/content"); }
+      catch(e){ pv.innerHTML=`<span class="muted" style="padding:20px;text-align:center">${esc(e.message)}</span>`; m.querySelector("#pvDl").disabled=true; return; }
+      m.querySelector("#pvDl").onclick=()=>saveBlob(blob,f.file_name);
+      const t=blob.type||"", url=URL.createObjectURL(blob);
+      if(t.startsWith("image/") && !t.includes("svg")) pv.innerHTML=`<img src="${url}" alt="">`;
+      else if(t.startsWith("video/")) pv.innerHTML=`<video src="${url}" controls></video>`;
+      else if(t.startsWith("audio/")) pv.innerHTML=`<audio src="${url}" controls style="width:100%;margin:20px"></audio>`;
+      else if(t==="application/pdf") pv.innerHTML=`<iframe src="${url}"></iframe>`;
+      else if(t.startsWith("text/")||/json|xml|javascript|csv|markdown|svg/.test(t)||/^(md|txt|log|py|js|ts|css|html|htm|json|csv|xml|yml|yaml|sql|java|c|cpp|sh)$/i.test(f.file_type)){
+        const txt=await blob.text(); const pre=document.createElement("pre"); pre.textContent=txt.length>500000?txt.slice(0,500000)+"\n… (truncated, download for the full file)":txt; pv.innerHTML=""; pv.appendChild(pre);
+      } else pv.innerHTML=`<span class="muted" style="padding:30px;text-align:center">No preview for this file type.<br>Use Download to open it.</span>`;
+    });
+  },
   "fl-info"(id){
     const f=fileById(id), fo=folderById(f.folder_id);
     modal(`<h3>${esc(f.file_name)}</h3><div class="hint" style="margin-bottom:8px">File details (fetched from the server)</div><div id="det" class="muted">Loading…</div><div class="foot"><button class="btn" data-x>Close</button></div>`, async m=>{
@@ -437,8 +492,14 @@ const actions = {
     const f=fileById(id);
     formModal({title:"Edit file",sub:"Update the file’s metadata.",submit:"Save",fields:[
       {html:`<label>File name</label><input id="eName" type="text" maxlength="100" required value="${esc(f.file_name)}">`},
-      {html:`<div class="row"><div><label>Type</label><input id="eType" type="text" maxlength="20" required value="${esc(f.file_type)}"></div><div><label>Size (bytes)</label><input id="eSize" type="number" min="1" required value="${f.file_size}"></div></div>`}],
-      async onSubmit(){ await api("PATCH","/files/"+id,{file_name:$("#eName").value.trim(),file_type:$("#eType").value.trim(),file_size:+$("#eSize").value}); toast("File updated"); await reload(); }});
+      {html:`<div class="row"><div><label>Type</label><input id="eType" type="text" maxlength="20" required value="${esc(f.file_type)}"></div><div><label>Size (bytes)</label><input id="eSize" type="number" min="1" required value="${f.file_size}"></div></div>`},
+      {html:`<label>Replace content (optional)</label><input id="eFile" type="file">`}],
+      async onSubmit(){
+        await api("PATCH","/files/"+id,{file_name:$("#eName").value.trim(),file_type:$("#eType").value.trim(),file_size:+$("#eSize").value});
+        const nf=$("#eFile").files[0];
+        if(nf) await uploadContent(id,nf);
+        toast("File updated"); await reload();
+      }});
   },
   "fl-move"(id){
     const f=fileById(id);
@@ -459,18 +520,21 @@ $("#btnNewFolder").onclick=()=>{
 };
 
 $("#btnNewFile").onclick=()=>{
-  formModal({title:"Add file",sub:"Pick a file from your computer to fill in the details automatically. The backend stores file metadata (name, type, size).",submit:"Add",fields:[
-    {html:`<label class="file-drop" style="display:block;margin-top:12px;color:var(--muted)" id="drop">Click to choose a file (optional)<input id="pick" type="file" class="hidden"></label>`},
-    {html:`<label>File name</label><input id="nName" type="text" maxlength="100" required>`},
-    {html:`<div class="row"><div><label>Type (extension)</label><input id="nType" type="text" maxlength="20" required placeholder="pdf"></div><div><label>Size (bytes)</label><input id="nSize" type="number" min="1" required placeholder="1024"></div></div>`}],
-    async onSubmit(){ await api("POST","/files/create",{file_name:$("#nName").value.trim(),file_type:$("#nType").value.trim(),file_size:+$("#nSize").value,folder_id:state.cwd}); toast("File added"); await reload(); }});
-  $("#pick").onchange=e=>{
-    const f=e.target.files[0]; if(!f) return;
-    $("#nName").value=f.name.slice(0,100);
-    const ext=(f.name.includes(".")?f.name.split(".").pop():(f.type||"file")).slice(0,20);
-    $("#nType").value=ext; $("#nSize").value=f.size||""; $("#drop").firstChild.textContent="Selected: "+f.name;
-    if(!f.size) $("#mErr").textContent="This file is empty — the backend requires size > 0.";
-  };
+  formModal({title:"Upload file",sub:state.cwd==null?"To My Drive":"To “"+esc(folderById(state.cwd).folder_name)+"”",submit:"Upload",fields:[
+    {html:`<label>File</label><input id="nFile" type="file" required>`},
+    {html:`<label>Name (you can rename it)</label><input id="nName" type="text" maxlength="100" required>`}],
+    async onSubmit(m){
+      const file=$("#nFile").files[0];
+      if(!file) throw new Error("Choose a file first.");
+      if(!file.size) throw new Error("This file is empty — empty files can’t be uploaded.");
+      const name=$("#nName").value.trim();
+      const ext=(name.includes(".")?name.split(".").pop():"file").slice(0,20);
+      const rec=await api("POST","/files/create",{file_name:name,file_type:ext,file_size:file.size,folder_id:state.cwd});
+      try{ await uploadContent(rec.file_id,file); }
+      catch(e){ try{ await api("DELETE","/files/"+rec.file_id) }catch{} throw e; }
+      toast("File uploaded"); await reload();
+    }});
+  $("#nFile").onchange=e=>{ const f=e.target.files[0]; if(f) $("#nName").value=f.name.slice(0,100); };
 };
 
 /* sharing (files + folders share the same shape) */
