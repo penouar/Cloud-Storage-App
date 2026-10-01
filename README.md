@@ -90,7 +90,19 @@ Cloud_Project/
 
 ---
 
-## 🚀 Running it locally
+## 🚀 Deployment
+
+Live and deployed on **[Render](https://render.com)** — a managed PostgreSQL instance plus a Dockerized FastAPI web service, built straight from this GitHub repo.
+
+🔗 **[cloud-storage-app-vsgf.onrender.com](https://cloud-storage-app-vsgf.onrender.com)**
+
+- `/` → the frontend (file/folder browser)
+- `/docs` → interactive Swagger UI for the API
+- `/health` → health check endpoint
+
+Every push to the connected branch triggers a new build/deploy on Render using the repo's `Dockerfile`.
+
+### Running it locally (optional)
 
 ```bash
 # 1. Clone and enter the project
